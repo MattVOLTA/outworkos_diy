@@ -1,0 +1,6 @@
+{
+  "name": "memory-system",
+  "description": "Persistent memory tree for Claude Code. Stores learnings, decisions, preferences, and project context across sessions. Includes rem-sleep (extract), recall (retrieve), and memory-init (project setup).",
+  "version": "1.0.0",
+  "author": { "name": "Matt" }
+}

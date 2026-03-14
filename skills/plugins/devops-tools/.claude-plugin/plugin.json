@@ -1,0 +1,8 @@
+{
+  "name": "devops-tools",
+  "description": "DevOps workflow guardian for commits/PRs, TDD enforcement, and git worktrees for isolated development",
+  "version": "1.0.0",
+  "author": {
+    "name": "Matt"
+  }
+}

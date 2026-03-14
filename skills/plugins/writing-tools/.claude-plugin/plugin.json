@@ -1,0 +1,8 @@
+{
+  "name": "writing-tools",
+  "description": "Matt's blog writer and personal writing style guide",
+  "version": "1.0.0",
+  "author": {
+    "name": "Matt"
+  }
+}

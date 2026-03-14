@@ -1,0 +1,19 @@
+{
+  "name": "matt-plugins",
+  "description": "Matt's Claude Code plugins for product development, DevOps, QA, and frontend workflows",
+  "version": "1.0.0",
+  "author": {
+    "name": "Matt"
+  },
+  "plugins": [
+    "product-tools",
+    "devops-tools",
+    "qa-tools",
+    "frontend-tools",
+    "claude-code-optimizer",
+    "context-engineering",
+    "senior-dev",
+    "writing-tools",
+    "memory-system"
+  ]
+}

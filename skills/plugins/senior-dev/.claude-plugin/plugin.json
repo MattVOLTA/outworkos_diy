@@ -1,0 +1,8 @@
+{
+  "name": "senior-dev",
+  "description": "Senior developer specialist with expertise in Node.js, React, TypeScript, and Supabase",
+  "version": "1.0.0",
+  "author": {
+    "name": "Matt"
+  }
+}

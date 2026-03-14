@@ -1,0 +1,8 @@
+{
+  "name": "product-tools",
+  "description": "SVPG product requirements, hierarchical documentation, and GitHub issue creation",
+  "version": "1.0.0",
+  "author": {
+    "name": "Matt"
+  }
+}

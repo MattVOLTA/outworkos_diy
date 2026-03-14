@@ -1,0 +1,72 @@
+# Outwork OS Configuration
+# Copy this file to outworkos.config.yaml and fill in your values.
+# Never commit outworkos.config.yaml — it contains your personal settings.
+
+# === REQUIRED ===
+
+user:
+  email: ""                        # Your primary email (Gmail address used for Google Workspace)
+  name: ""                         # Your display name
+  timezone: "America/New_York"     # IANA timezone (e.g., America/Halifax, Europe/London)
+  domain: ""                       # Your organization's email domain (e.g., company.com)
+
+supabase:
+  project_id: ""                   # Your Supabase project ID (from project settings)
+  url: ""                          # e.g., https://abcdef123456.supabase.co
+  anon_key: ""                     # Public anon key (safe to store here — it's not a secret)
+
+storage:
+  root: ""                         # Absolute path to this repo (e.g., /Users/you/outworkos_diy)
+  parent: ""                       # Parent directory for all project folders (e.g., /Users/you/projects)
+
+# === CORE INTEGRATIONS (required) ===
+
+integrations:
+  google_workspace:
+    enabled: true
+    client_id: ""                  # From your Google Cloud Console OAuth 2.0 credentials
+    client_secret: ""              # From your Google Cloud Console OAuth 2.0 credentials
+    redirect_port: 5555            # Local port for OAuth callback
+
+  todoist:
+    enabled: true
+    # API token stored in Supabase Vault (set during /setup)
+
+  # === OPTIONAL INTEGRATIONS ===
+  # Enable any of these and provide credentials during /setup
+
+  github:
+    enabled: false
+
+  fireflies:
+    enabled: false
+
+  slack:
+    enabled: false
+
+  pushover:
+    enabled: false
+
+  limitless_pendant:
+    enabled: false
+
+  fal_ai:
+    enabled: false
+    download_path: "~/Downloads/fal-ai"
+
+  xero:
+    enabled: false
+
+  linkedin:
+    enabled: false
+
+  netlify:
+    enabled: false
+
+  context7:
+    enabled: false
+
+# === OPTIONAL USER SETTINGS ===
+
+scheduling_link: ""                # e.g., https://cal.com/yourname (used by email-composer)
+accounting_email: ""               # e.g., accounting@company.com (used by receipts pipeline)
