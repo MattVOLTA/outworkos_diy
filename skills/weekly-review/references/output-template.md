@@ -3,87 +3,43 @@
 Use this template to format the review output. Replace placeholders with actual data.
 
 ```markdown
-# Weekly Review: {start_date} — {end_date}
+# Week in Review: {start_date} -- {end_date}
 
-## Summary
+## The Gains
 
-| Metric | Count |
-|--------|-------|
-| Log entries | {total_log_entries} |
-| Tasks completed | {total_tasks_completed} |
-| Email threads | {total_email_threads} |
-| Meetings held | {total_meetings} |
-| Active projects | {active_project_count} |
-| Stalled projects | {stalled_project_count} |
+{3-5 bullet points. Each is a single sentence capturing a meaningful moment of forward progress — something shipped, crossed a finish line, went from zero to one, or unblocked a larger initiative. Lead with the accomplishment, not the project name.}
 
-## Project Activity
+- {gain_1}
+- {gain_2}
+- {gain_3}
+- {gain_4 — optional}
+- {gain_5 — optional}
 
-{For each active project, sorted by total activity (most active first):}
+## Project Progress
+
+{For each active project, sorted by significance of progress (most meaningful first). Only include projects where something moved forward. No inactive or stalled projects.}
 
 ### {project_name}
 
-| Source | Activity |
-|--------|----------|
-| Log entries | {count} |
-| Tasks completed | {count} |
-| Email threads | {count} |
-| Meetings | {count} |
+{1-2 paragraphs of reflective prose. Answer: Where was this at the start of the week? What moved forward? Why does it matter? Write in a warm, honest tone — like recapping for a trusted colleague. No bullet points, no tables, no activity counts.}
 
-**What happened**: {Brief summary from log entries — 1-2 sentences per log entry}
+### {project_name}
 
----
+{1-2 paragraphs}
 
-## Stalled Projects
+...
 
-{Projects with zero activity across all sources during the review window}
+## Looking Ahead
 
-| Project | Last Activity | Days Inactive |
-|---------|--------------|---------------|
-| {project_name} | {last_log_date or "No logs"} | {days} |
-
-{If no stalled projects: "All projects had activity this week."}
-
-## Highlights
-
-{Top 3-5 accomplishments pulled from log entry content, most significant first}
-
-1. **{project_name}**: {accomplishment from log}
-2. **{project_name}**: {accomplishment from log}
-3. **{project_name}**: {accomplishment from log}
-
-## Blockers
-
-{Tasks in "Waiting" sections across all Todoist projects}
-
-| Task | Project | Waiting Since |
-|------|---------|--------------|
-| {task_content} | {project_name} | {added_date} |
-
-{If no blockers: "No tasks in Waiting sections."}
-
-## Upcoming Deadlines
-
-{Tasks due in the next 7 days}
-
-| Task | Project | Due Date |
-|------|---------|----------|
-| {task_content} | {project_name} | {due_date} |
-
-{If no upcoming deadlines: "No tasks due in the next 7 days."}
-
-## Recommended Priorities
-
-Based on this week's activity:
-
-1. **{recommendation}** — {rationale based on stalled projects, blockers, or deadlines}
-2. **{recommendation}** — {rationale}
-3. **{recommendation}** — {rationale}
+{A brief paragraph (3-5 sentences) on the momentum carrying into next week. What energy are you building on? What threads are you picking up? Frame as direction and opportunity, not pressure. If a previous review exists, note week-over-week momentum.}
 ```
 
 ## Formatting Rules
 
-- Sort projects by total activity count (sum of all sources), most active first
-- For stalled projects, calculate days since last `log_entries` record
-- Highlights should be drawn from `log_entries.content` — pick the most impactful items
-- Recommendations should prioritize: (1) stalled projects that need attention, (2) blockers that can be unblocked, (3) upcoming deadlines
-- If a data source was unavailable, add a note at the bottom: "Note: {source} data unavailable — {reason}"
+- **Prose only** — no tables, no bullet points in project sections, no metric counts
+- **Gains section** uses bullets — these are the only bullets in the review
+- **Sort by significance**, not activity volume — a single breakthrough outranks 20 routine tasks
+- **Warm, reflective tone** — this is a personal reflection, not a stakeholder report
+- **Active projects only** — if nothing moved forward, the project does not appear
+- **No blockers, no deadlines, no stalled projects** — those belong in `/scan`
+- If a data source was unavailable, add a brief note at the end: "Note: {source} data was unavailable this week."
