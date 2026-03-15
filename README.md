@@ -145,7 +145,7 @@ See [SETUP.md](SETUP.md) for detailed setup instructions, optional integrations,
 | `/log` | Records session accomplishments to the database timeline |
 | `/risk` | Finds open tasks where follow-through is missing by cross-referencing sent mail, logs, and calendar |
 | `/risk-review` | Interactive walkthrough of top 5 risk items — reply, close, reschedule, or delegate each one |
-| `/weekly-review` | Cross-project retrospective aggregating logs, completions, emails, and meetings for the past 7 days |
+| `/weekly-review` | Gain-based weekly reflection — narrative prose measuring progress against where you were, not where you wish you were |
 
 ### Meetings & Communication
 
