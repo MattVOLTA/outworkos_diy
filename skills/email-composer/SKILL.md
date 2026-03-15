@@ -107,11 +107,15 @@ Use `body_format: "html"` for all emails so the signature renders correctly. Wra
 
 ### For Drafts
 
-Use the Google Workspace MCP `draft_gmail_message` tool with `body_format: "html"`. The user will review and send from Gmail.
+**Full mode:** Use the Google Workspace MCP `draft_gmail_message` tool with `body_format: "html"`. The user will review and send from Gmail.
+
+**Quick mode:** Use the built-in `gmail_create_draft` tool (discovered via `ToolSearch: "+gmail draft"`). Use `contentType: "text/html"`. This tool does not auto-append a Gmail signature — append the user's sign-off name at the end of the body. The user adds their full signature when sending from Gmail.
 
 ### For Programmatic Sends
 
-Use the Google Workspace MCP `send_gmail_message` tool with `body_format: "html"`. Only use programmatic send when the user explicitly says "send it" (not "draft it" or "save it").
+**Full mode only.** Use the Google Workspace MCP `send_gmail_message` tool with `body_format: "html"`. Only use programmatic send when the user explicitly says "send it" (not "draft it" or "save it").
+
+**Quick mode:** Programmatic send is not available. Always create a draft and tell the user: "Draft created — open Gmail to review and send." If the user says "send it", explain that quick mode only supports drafts and suggest switching to `mode: "full"` in `outworkos.config.yaml`.
 
 ## Threading
 

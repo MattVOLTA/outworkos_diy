@@ -102,7 +102,37 @@ VALUES (
 
 ## Step 5: Set Up Google Workspace
 
-### Create OAuth Credentials
+### Choose Your Mode
+
+Outwork OS supports two Google Workspace modes. Set `mode` in your config:
+
+```yaml
+integrations:
+  google_workspace:
+    enabled: true
+    mode: "quick"    # or "full"
+```
+
+| | Quick Mode | Full Mode |
+|---|---|---|
+| **Setup** | None — uses Anthropic's built-in connectors | Google Cloud Console OAuth app required |
+| **Gmail read** | Yes (search, read, threads) | Yes |
+| **Gmail draft** | Yes (create drafts) | Yes (with signature auto-append) |
+| **Gmail send** | No — draft only, send from Gmail | Yes (programmatic send) |
+| **Gmail archive** | No — /scan reports noise but can't auto-archive | Yes (auto-archive noise and resolved emails) |
+| **Calendar** | Full (list, create, update, delete, find times) | Full |
+| **Contacts** | No | Yes (read + write-back enrichment) |
+| **Drive** | No | Yes |
+
+### Quick Mode (Recommended for Getting Started)
+
+No setup needed. The built-in Anthropic Gmail and Calendar connectors are available automatically in Claude Code. **Skip to Step 6.**
+
+You can upgrade to full mode at any time by completing the full mode steps below and changing `mode: "full"` in your config.
+
+### Full Mode
+
+#### Create OAuth Credentials
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Create a new project (or use an existing one)
@@ -116,14 +146,14 @@ VALUES (
 6. Add `http://localhost:5555/oauth/callback` as an authorized redirect URI
 7. Note the **Client ID** and **Client Secret**
 
-### Store Google Credentials in Vault
+#### Store Google Credentials in Vault
 
 ```bash
 ./scripts/set-secret.sh google_client_id "your-client-id"
 ./scripts/set-secret.sh google_client_secret "your-client-secret"
 ```
 
-### Authorize Google
+#### Authorize Google
 
 ```bash
 ./scripts/google-auth.sh
@@ -131,7 +161,7 @@ VALUES (
 
 This opens your browser for OAuth consent. The refresh token is stored in Vault automatically.
 
-### Add Google Workspace MCP
+#### Add Google Workspace MCP
 
 Add to your `.mcp.json`:
 

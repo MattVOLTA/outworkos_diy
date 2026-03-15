@@ -8,6 +8,38 @@ Quick reference for Gmail REST API, Todoist Sync API, Slack MCP, and credential 
 
 ---
 
+## Google Workspace Mode
+
+The `GOOGLE_WORKSPACE_MODE` environment variable (set by `load-config.sh`) determines which Gmail tools are available. Default: `quick`.
+
+| Capability | Quick Mode (built-in MCP) | Full Mode (REST API + self-hosted MCP) |
+|------------|--------------------------|---------------------------------------|
+| Search inbox | `gmail_search_messages` (built-in, up to 500 results) | REST `messages.list` with OAuth token |
+| Read message | `gmail_read_message` (built-in) | REST `messages.get` with OAuth token |
+| Read thread | `gmail_read_thread` (built-in) | REST via thread_id |
+| Create draft | `gmail_create_draft` (built-in) | `draft_gmail_message` (self-hosted MCP) |
+| Send email | **NOT AVAILABLE** | `send_gmail_message` (self-hosted MCP) |
+| Archive (batchModify) | **NOT AVAILABLE** | REST `messages.batchModify` |
+| Contacts | **NOT AVAILABLE** | `manage_contact` (self-hosted MCP) |
+| Calendar | `gcal_list_events`, etc. (built-in, full CRUD) | Same tools via self-hosted MCP |
+
+**Quick mode limitations for /scan:**
+- Archive noise + filtered (Phase 1a step 5): **SKIP.** Report noise counts but leave messages in inbox. Set `"archive_skipped": true` in output.
+- Archive resolved Gmail (Phase 5c): **SKIP.** Same.
+- Reply detection (Phase 1a step 3): Works normally — `gmail_search_messages` with `from:{USER_EMAIL}` is read-only.
+
+**Quick mode detection at runtime:**
+```bash
+source "$OUTWORKOS_ROOT/scripts/load-config.sh"
+if [ "$GOOGLE_WORKSPACE_MODE" = "full" ]; then
+  # Use REST API patterns below
+else
+  # Use ToolSearch to find built-in Gmail/Calendar MCP tools
+fi
+```
+
+---
+
 ## Credentials — Phase 0c
 
 ### Gmail OAuth Token Refresh
@@ -28,6 +60,8 @@ ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
 **Base URL:** `https://gmail.googleapis.com/gmail/v1/users/me`
 **Auth header:** `Authorization: Bearer $ACCESS_TOKEN`
 **MCP Fallback:** If API returns 401, use `ToolSearch: "+google gmail"` to discover MCP tools.
+
+**Quick mode:** The OAuth token refresh above is not needed. The built-in MCP connectors handle their own authentication. Skip directly to using `gmail_search_messages` (built-in) via `ToolSearch: "+gmail"`.
 
 ### Todoist Token
 
@@ -97,6 +131,8 @@ curl -s -X POST "https://gmail.googleapis.com/gmail/v1/users/me/messages/batchMo
 - **Mark read** = remove `UNREAD` label
 - Max **1,000 message IDs per call**
 - **Empty response body = success**
+
+**Quick mode:** `batchModify` is not available. The Signal Agent should still count noise and filtered emails but skip the archival API call. Include `"archive_skipped": true` in the output JSON and set `"archive_skipped_reason": "quick mode — no Gmail modify access"`.
 
 ### Reply Detection — Bulk Approach
 

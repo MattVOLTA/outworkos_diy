@@ -163,9 +163,11 @@ Write 1-2 paragraphs. Open with a one-line reminder of who this person is and ho
 
 After presenting the briefing, write enriched data back to Google Contacts and Supabase. This step runs silently — don't wait for user confirmation.
 
+> **Quick mode gate:** Skip Google Contacts write-back (the `manage_contact` tool is not available in quick mode). Still write to the Supabase `contacts` table below.
+
 **For each external attendee where new data was discovered:**
 
-1. **Google Contacts** — Use ToolSearch to find the Google Workspace `manage_contact` tool.
+1. **Google Contacts** (full mode only) — Use ToolSearch to find the Google Workspace `manage_contact` tool.
    - If contact doesn't exist: create with name, email, title, org, phone
    - If contact exists but is missing title/org/phone: update with discovered data
    - Write a brief summary to the `notes` field: company overview + how you're connected (e.g., "Senior Director, Innovation at Clearwater Seafoods. Connected via Paul Owens (ACOA) for AI adoption discussion, March 2026.")

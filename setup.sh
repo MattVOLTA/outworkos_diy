@@ -519,11 +519,17 @@ echo ""
 echo "$(_bold "9. Google Workspace")"
 
 GW_ENABLED="$(yaml_get "$CONFIG_FILE" "integrations.google_workspace.enabled")"
+GW_MODE="$(yaml_get "$CONFIG_FILE" "integrations.google_workspace.mode")"
+GW_MODE="${GW_MODE:-quick}"
 
 if [ "$GW_ENABLED" != "true" ]; then
   skip "Google Workspace not enabled in config"
+elif [ "$GW_MODE" = "quick" ]; then
+  ok "Quick mode — uses Anthropic built-in Gmail + Calendar connectors"
+  info "No Google Cloud Console setup needed. Read + draft Gmail, full Calendar."
+  info "Switch to mode: \"full\" in config for send, archive, Contacts, and Drive."
 else
-  # Check if Google client credentials are in Vault
+  # Full mode: check if Google client credentials are in Vault
   G_CLIENT_ID=$("$SCRIPT_DIR/scripts/get-secret.sh" google_client_id 2>/dev/null || true)
   G_CLIENT_SECRET=$("$SCRIPT_DIR/scripts/get-secret.sh" google_client_secret 2>/dev/null || true)
   G_REFRESH=$("$SCRIPT_DIR/scripts/get-secret.sh" google_refresh_token 2>/dev/null || true)

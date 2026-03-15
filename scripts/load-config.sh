@@ -110,6 +110,7 @@ emit('OUTWORKOS_PARENT', storage.get('parent'))
 # Google Workspace
 integrations = config.get('integrations', {})
 gw = integrations.get('google_workspace', {})
+emit('GOOGLE_WORKSPACE_MODE', gw.get('mode', 'quick'))
 emit('GOOGLE_OAUTH_CLIENT_ID', gw.get('client_id'))
 emit('GOOGLE_OAUTH_CLIENT_SECRET', gw.get('client_secret'))
 emit('GOOGLE_OAUTH_REDIRECT_PORT', gw.get('redirect_port'))

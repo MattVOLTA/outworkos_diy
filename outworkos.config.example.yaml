@@ -24,9 +24,11 @@ storage:
 integrations:
   google_workspace:
     enabled: true
-    client_id: ""                  # From your Google Cloud Console OAuth 2.0 credentials
-    client_secret: ""              # From your Google Cloud Console OAuth 2.0 credentials
-    redirect_port: 5555            # Local port for OAuth callback
+    mode: "quick"                  # "quick" = Anthropic built-in connectors (zero setup, read + draft only)
+                                   # "full"  = Custom OAuth (Gmail send/archive, Contacts, Drive — requires Google Cloud Console)
+    client_id: ""                  # Full mode only — from Google Cloud Console OAuth 2.0 credentials
+    client_secret: ""              # Full mode only — from Google Cloud Console OAuth 2.0 credentials
+    redirect_port: 5555            # Full mode only — local port for OAuth callback
 
   todoist:
     enabled: true

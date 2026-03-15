@@ -115,24 +115,27 @@ echo "You have full read access to all files in any of these projects."
 echo "Use Read/Glob/Grep to drill into any project for details."
 echo "${MANIFEST}"
 
-# --- Google OAuth Token Health Check (via Vault) ---
-GET_SECRET="${_OUTWORKOS_ROOT}/scripts/get-secret.sh"
-if [ -x "$GET_SECRET" ]; then
-  _G_CLIENT_ID=$("$GET_SECRET" google_client_id 2>/dev/null) || true
-  _G_CLIENT_SECRET=$("$GET_SECRET" google_client_secret 2>/dev/null) || true
-  _G_REFRESH_TOKEN=$("$GET_SECRET" google_refresh_token 2>/dev/null) || true
+# --- Google OAuth Token Health Check (full mode only) ---
+_GW_MODE="${GOOGLE_WORKSPACE_MODE:-quick}"
+if [ "$_GW_MODE" = "full" ]; then
+  GET_SECRET="${_OUTWORKOS_ROOT}/scripts/get-secret.sh"
+  if [ -x "$GET_SECRET" ]; then
+    _G_CLIENT_ID=$("$GET_SECRET" google_client_id 2>/dev/null) || true
+    _G_CLIENT_SECRET=$("$GET_SECRET" google_client_secret 2>/dev/null) || true
+    _G_REFRESH_TOKEN=$("$GET_SECRET" google_refresh_token 2>/dev/null) || true
 
-  if [ -n "$_G_CLIENT_ID" ] && [ -n "$_G_CLIENT_SECRET" ] && [ -n "$_G_REFRESH_TOKEN" ]; then
-    _TOKEN_RESP=$(curl -s --max-time 5 -X POST https://oauth2.googleapis.com/token \
-      -d "client_id=$_G_CLIENT_ID" \
-      -d "client_secret=$_G_CLIENT_SECRET" \
-      -d "refresh_token=$_G_REFRESH_TOKEN" \
-      -d "grant_type=refresh_token" 2>/dev/null)
+    if [ -n "$_G_CLIENT_ID" ] && [ -n "$_G_CLIENT_SECRET" ] && [ -n "$_G_REFRESH_TOKEN" ]; then
+      _TOKEN_RESP=$(curl -s --max-time 5 -X POST https://oauth2.googleapis.com/token \
+        -d "client_id=$_G_CLIENT_ID" \
+        -d "client_secret=$_G_CLIENT_SECRET" \
+        -d "refresh_token=$_G_REFRESH_TOKEN" \
+        -d "grant_type=refresh_token" 2>/dev/null)
 
-    if echo "$_TOKEN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'access_token' in d" 2>/dev/null; then
-      echo "Google OAuth: OK"
-    else
-      echo "Google OAuth token may be expired or invalid. Run: scripts/google-auth.sh"
+      if echo "$_TOKEN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'access_token' in d" 2>/dev/null; then
+        echo "Google OAuth: OK"
+      else
+        echo "Google OAuth token may be expired or invalid. Run: scripts/google-auth.sh"
+      fi
     fi
   fi
 fi

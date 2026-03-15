@@ -108,6 +108,8 @@ Run Gmail and Slack scans in parallel. Read detailed patterns in `references/api
 
 Spawn a **Signal Agent** (subagent_type: `general-purpose`, model: `sonnet`). Pass it the Gmail access token, scan window, and noise filter rules from Phase 0a.
 
+> **Quick mode gate:** If `GOOGLE_WORKSPACE_MODE` is `quick`, the Signal Agent runs all phases normally but SKIPS archival in phase 5 (no `batchModify` available). It still counts noise and filtered emails. Set `"archive_skipped": true` in output. The main scan notes: "Noise identified but not archived (quick mode). Switch to full mode to enable auto-archive."
+
 The Signal Agent runs six phases:
 1. **Fetch signal emails** — `in:inbox newer_than:Nd -category:promotions -category:social -category:forums -category:updates`. Extract message_id, thread_id, subject, from_name, from_email, date, is_important.
 2. **Fetch and archive noise categories** — For each category (promotions, social, forums, updates), search `in:inbox category:{category}` to get message IDs. Collect all IDs for archival. Record counts per category.
@@ -321,6 +323,8 @@ After creating gap tasks, apply the `scan` label to every task that should appea
 Use a single Sync API batch call to apply the label. Read the pattern in `references/todoist-patterns.md`.
 
 ### 5c. Archive Resolved Gmail
+
+> **Quick mode gate:** If `GOOGLE_WORKSPACE_MODE` is `quick`, skip Phase 5c archival entirely. Still run the inbox count query via built-in `gmail_search_messages(q: "in:inbox")` for reporting, but do not attempt `batchModify`. Note in output: "N emails identified for archival but left in inbox (quick mode)."
 
 For each signal email that now has a clear disposition, archive it:
 
