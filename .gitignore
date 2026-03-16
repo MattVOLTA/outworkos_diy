@@ -11,9 +11,14 @@ outworkos.config.yaml
 
 # Claude Code
 .claude/settings.local.json
+.claude/commands/
+.mcp.json
 
 # Todoist cache
 /tmp/todoist-sync-cache.json
+
+# Supabase
+supabase/.temp
 
 # Node
 node_modules/
@@ -26,6 +31,9 @@ venv/
 
 # Logs
 *.log
+
+# Candid review state
+.candid/last-review.json
 
 # Local Netlify folder
 .netlify
