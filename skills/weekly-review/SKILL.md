@@ -1,21 +1,12 @@
 ---
 name: weekly-review
-description: "Gain-based weekly reflection. Looks backward at what moved forward across all projects, written as narrative prose. Modeled on The Gap and The Gain — measures progress against where you were, not where you wish you were."
+description: "Cross-project weekly retrospective. Aggregates log entries, Todoist completions, Gmail threads, and Fireflies meetings across all projects for the past 7 days. Use for weekly reviews, board updates, identifying stalled projects, or asking 'what happened this week'."
 context: fork
 ---
 
 # /weekly-review
 
-Generate a reflective weekly review that measures progress backward — what you accomplished relative to where each project was 7 days ago.
-
-## Philosophy
-
-This skill is built on **The Gap and The Gain** framework (Dan Sullivan & Benjamin Hardy):
-
-- **The Gap** = measuring against an ideal. Always out of reach. Breeds dissatisfaction.
-- **The Gain** = measuring against your previous self. Concrete, motivating, yours.
-
-This review measures **the Gain**. No shame lists. No blocker tables. No deadline pressure. Just an honest look backward at what moved forward and why it matters.
+Generate a cross-project retrospective for a given time window (default: last 7 days).
 
 ## Runtime Context
 
@@ -31,10 +22,10 @@ Store these values as `USER_EMAIL` and `USER_TIMEZONE` for use throughout all st
 
 ## When to Use
 
-- End-of-week reflection
-- Preparing board updates or stakeholder summaries
-- Reconnecting with progress after a scattered week
-- Asking "what did I actually accomplish?"
+- Weekly planning or reflection
+- Preparing board updates or status reports
+- Identifying stalled or neglected projects
+- Asking "what happened this week?" or "what did I work on?"
 
 ## Workflow
 
@@ -44,70 +35,63 @@ Default: last 7 days from today. Accept optional user input for custom range (e.
 
 Calculate `start_date` and `end_date` in `YYYY-MM-DD` format.
 
-### Step 2: Gather Raw Data (in parallel)
+### Step 2: Gather Log Entries
 
-Run all four data source queries simultaneously — they are independent.
+Query `log_entries` table via Supabase MCP `execute_sql` for all entries in the date range. Group by `project_id`.
 
-Read `references/data-queries.md` for the exact query patterns.
+Read `references/data-queries.md` for the SQL query pattern.
 
-1. **Log entries** — from `log_entries` table via Supabase MCP
-2. **Todoist completions** — completed tasks via Sync API
-3. **Gmail threads** — volume and key contacts via Google Workspace MCP
-4. **Fireflies meetings** — transcribed meetings via Fireflies MCP
+### Step 3: Gather Todoist Completions
 
-### Step 3: Filter to Active Projects Only
+Fetch all completed tasks from Todoist Sync API using the completed items endpoint. Filter by `completed_at` within the date range. Group by project.
 
-Group all data by project. **Discard any project with zero meaningful activity.** A project appears in the review only if something moved forward — a log entry was written, tasks were completed, or a meeting advanced the work.
+Read `references/data-queries.md` for the Todoist API pattern.
 
-Do not list stalled or inactive projects. They are irrelevant to a Gain-based reflection.
+### Step 4: Gather Gmail Volume
 
-### Step 4: Synthesize Per-Project Narratives
+Search Gmail via Google Workspace MCP for threads in the date range per project. Use known contact emails from the session manifest to map threads to projects.
 
-For each active project, write **1-2 paragraphs of prose** that answer three questions:
+Read `references/data-queries.md` for Gmail search patterns.
 
-1. **Where was this at the start of the week?** — Use context from log entries, prior state, or what was pending.
-2. **What moved forward?** — Concrete accomplishments: things shipped, decisions made, conversations had, problems solved.
-3. **Why does it matter?** — Connect the progress to the larger goal. What does this unlock? Why should the user feel good about it?
+### Step 5: Gather Fireflies Meetings
 
-**Tone**: Warm, reflective, honest. Like a trusted advisor recapping your week over coffee. Not a status report. Not bullet points. Prose.
+Search Fireflies for meetings in the date range. Map to projects by participant email or title keywords.
 
-**Ordering**: Sort projects by significance of progress, not volume of activity. A single breakthrough matters more than 20 routine tasks.
+Read `references/data-queries.md` for Fireflies query pattern.
 
-### Step 5: Identify the Top Gains
+### Step 6: Aggregate and Analyze
 
-Pull out the **3-5 most meaningful gains** across all projects. These are not "tasks completed" — they are moments of real forward progress. Ask:
+Combine all data sources into a per-project activity summary. Identify:
 
-- Did something go from zero to one? (new capability, new relationship, new system)
-- Did something cross a finish line? (shipped, delivered, approved, signed off)
-- Did something unblock a larger initiative?
-- Did you learn something that changes how you'll approach the work?
-
-Write each gain as a single sentence that captures both the what and the why.
-
-### Step 6: Write the Looking Ahead Section
-
-A brief paragraph (3-5 sentences) on **momentum carrying into next week**. Frame positively — what energy and progress you're building on, not what's overdue. This is not a to-do list. It's a sense of direction.
-
-If a previous weekly review exists in `briefs/`, optionally reference it to show week-over-week momentum.
+- **Active projects** — Have log entries, completed tasks, or email activity
+- **Stalled projects** — Zero activity across all sources in the review window
+- **Top accomplishments** — Pull from log entry content
+- **Open blockers** — Tasks in "Waiting" sections across all Todoist projects
+- **Upcoming deadlines** — Tasks with due dates in the next 7 days
 
 ### Step 7: Format Output
 
-Use the template in `references/output-template.md`. The final output should feel like something you'd want to read, not something you have to read.
+Present using the template in `references/output-template.md`:
+
+1. Summary stats (totals across all projects)
+2. Per-project breakdown (sorted by activity level, most active first)
+3. Stalled projects list
+4. Highlights (top accomplishments from logs)
+5. Blockers (Waiting section items)
+6. Recommended priorities for coming week
 
 ### Step 8: Offer Follow-up Actions
 
 Ask the user:
-1. **Save to file** — Write the review to `briefs/weekly-review-YYYY-MM-DD.md`
-2. **Create momentum tasks** — Add 2-3 tasks to Todoist that build on this week's gains
-3. **Done** — No further action
+1. **Save to file** — Write the review to `briefs/weekly-review-YYYY-MM-DD.txt`
+2. **Create priority tasks** — Add recommended priorities as Todoist tasks
+3. **Generate audio brief** — Produce a spoken version via ElevenLabs (reuse `/sitrep` audio patterns)
+4. **Done** — No further action
 
 ## Key Rules
 
 - All secrets from Vault via `$OUTWORKOS_ROOT/scripts/get-secret.sh <label>`
 - Never hardcode MCP tool names — use ToolSearch to discover available tools
-- Run data source queries in parallel (Step 2)
-- Graceful degradation: if a data source is unavailable, note it briefly and continue
+- Run data source queries in parallel (Steps 2-5 are independent)
+- Graceful degradation: if a data source is unavailable, note it in the output and continue
 - User ID for DB queries: always use `auth.uid()` — never hardcode a user ID
-- **Never include metrics tables, activity counts, or stalled project lists**
-- **Never list blockers or deadlines** — that's what `/scan` is for
-- **Only include projects where something moved forward**

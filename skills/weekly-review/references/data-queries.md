@@ -1,7 +1,5 @@
 # Data Queries for Weekly Review
 
-The data gathering step is unchanged from a traditional review — you still need the raw inputs. The difference is in how they're synthesized (narrative prose, not metrics tables).
-
 ## Log Entries (Supabase)
 
 Query via Supabase MCP `execute_sql`:
@@ -22,7 +20,7 @@ WHERE le.user_id = auth.uid()
 ORDER BY le.entry_date DESC;
 ```
 
-Log entries are the richest source for narrative synthesis — they contain session summaries with context about what was accomplished and why.
+Group results by `project_id` to get per-project activity.
 
 ## Todoist Completed Tasks
 
@@ -56,8 +54,6 @@ curl -s "https://api.todoist.com/sync/v9/completed/get_all" \
 
 Map `project_id` to project names using the session manifest or a Sync API call with `resource_types: ["projects"]`.
 
-Completed tasks supplement log entries — they show the granular work that happened even when a formal log entry wasn't written.
-
 ## Gmail Thread Volume
 
 Search via Google Workspace MCP Gmail search tool using `USER_EMAIL` from Runtime Context:
@@ -70,7 +66,7 @@ query: "after:{start_yyyy/mm/dd} before:{end_yyyy/mm/dd}"
 query: "from:contact@example.com OR to:contact@example.com after:{start} before:{end}"
 ```
 
-Gmail data helps identify which relationships were active — conversations had, decisions communicated, introductions made.
+Count unique threads per project. If a project has no known contacts in the manifest, skip Gmail for that project.
 
 ## Fireflies Meetings
 
@@ -85,12 +81,36 @@ Filter results by `dateString` within the date range. Map to projects by:
 2. Matching meeting title keywords to project names
 3. If no match, list under "Unmatched Meetings"
 
-Meeting data reveals collaboration and decision-making that may not appear in logs or tasks.
+## Todoist Waiting/Blocked Items
 
-## Usage Notes
+To find blockers, query for tasks in "Waiting" sections:
 
-- **Run all four queries in parallel** — they are independent
-- **Log entries are primary** — they have the richest narrative content for synthesis
-- **Tasks and emails are supplementary** — they fill in gaps where no log entry was written
-- **Meetings provide color** — participant lists and titles help reconstruct the week's conversations
-- **No blocker or deadline queries needed** — this review is backward-looking only
+```bash
+TODOIST_API_TOKEN=$("$OUTWORKOS_ROOT/scripts/get-secret.sh" todoist_api_token)
+curl -s -X POST https://api.todoist.com/api/v1/sync \
+  -H "Authorization: Bearer $TODOIST_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"sync_token": "*", "resource_types": ["items", "sections"]}'
+```
+
+Filter client-side:
+```python
+# Find all "Waiting" section IDs
+waiting_sections = [s['id'] for s in data['sections'] if s['name'] == 'Waiting']
+# Filter tasks in those sections
+blocked = [t for t in data['items'] if t.get('section_id') in waiting_sections and not t.get('checked')]
+```
+
+## Upcoming Deadlines
+
+From the same Todoist sync response, find tasks due in the next 7 days:
+
+```python
+from datetime import datetime, timedelta
+next_week = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
+today = datetime.now().strftime('%Y-%m-%d')
+upcoming = [t for t in data['items']
+            if t.get('due') and t['due'].get('date')
+            and today <= t['due']['date'] <= next_week
+            and not t.get('checked')]
+```
