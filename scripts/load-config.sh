@@ -26,13 +26,19 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 # Parse YAML with Python (available on macOS by default)
-eval "$(python3 -c "
-import sys, json
+# NOTE: heredoc is written to a temp file first, then executed inside $(),
+# because bash 3.2 (macOS default) has a bug where the $() parser tries to
+# balance quotes inside heredoc content even when the delimiter is quoted.
+_OUTWORKOS_PYPARSER=$(mktemp)
+cat > "$_OUTWORKOS_PYPARSER" << 'PYEOF'
+import sys, json, re
+
+config_path = sys.argv[1]
 
 # Minimal YAML parser — handles the flat/nested structure of outworkos.config.yaml
 # without requiring pyyaml to be installed
 def parse_yaml(path):
-    \"\"\"Parse simple YAML (scalars, nested objects) without external dependencies.\"\"\"
+    """Parse simple YAML (scalars, nested objects) without external dependencies."""
     result = {}
     stack = [result]
     indent_stack = [-1]
@@ -59,11 +65,11 @@ def parse_yaml(path):
                 # Remove inline comments
                 if value and '#' in value:
                     # Don't strip # inside quotes
-                    if not (value.startswith('\"') or value.startswith(\"'\")):
+                    if not (value.startswith('"') or value.startswith("'")):
                         value = value.split('#')[0].strip()
 
                 # Remove quotes
-                if value and value[0] in ('\"', \"'\") and value[-1] == value[0]:
+                if value and value[0] in ('"', "'") and value[-1] == value[0]:
                     value = value[1:-1]
 
                 if value == '' or value is None:
@@ -81,13 +87,16 @@ def parse_yaml(path):
 
     return result
 
-config = parse_yaml('$CONFIG_FILE')
+config = parse_yaml(config_path)
 
 def emit(env_var, value):
     if value is not None and value != '':
+        # Validate env var name to prevent injection
+        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', env_var):
+            return
         # Escape single quotes in value
-        safe = str(value).replace(\"'\", \"'\\\"'\\\"'\")
-        print(f\"export {env_var}='{safe}'\")
+        safe = str(value).replace("'", "'\"'\"'")
+        print(f"export {env_var}='{safe}'")
 
 # User
 user = config.get('user', {})
@@ -104,7 +113,7 @@ emit('SUPABASE_ANON_KEY', sb.get('anon_key'))
 
 # Storage
 storage = config.get('storage', {})
-emit('OUTWORKOS_ROOT', storage.get('root'))
+emit('OUTWORKOS_HOME', storage.get('home') or storage.get('root'))
 emit('OUTWORKOS_PARENT', storage.get('parent'))
 
 # Google Workspace
@@ -128,7 +137,11 @@ for name, settings in integrations.items():
         # Emit extra settings for specific integrations
         if name == 'fal_ai' and settings.get('download_path'):
             emit('FAL_DOWNLOAD_PATH', settings['download_path'])
-" 2>&1)"
+PYEOF
+eval "$(python3 "$_OUTWORKOS_PYPARSER" "$CONFIG_FILE")" 2>/dev/null
+rm -f "$_OUTWORKOS_PYPARSER"
 
-# Export OUTWORKOS_ROOT fallback if not set by config
-export OUTWORKOS_ROOT="${OUTWORKOS_ROOT:-$REPO_ROOT}"
+# OUTWORKOS_ROOT always points to the repo (where scripts/, skills/, etc. live)
+export OUTWORKOS_ROOT="$REPO_ROOT"
+# OUTWORKOS_HOME is the data directory (defaults to repo root if not configured)
+export OUTWORKOS_HOME="${OUTWORKOS_HOME:-$REPO_ROOT}"
