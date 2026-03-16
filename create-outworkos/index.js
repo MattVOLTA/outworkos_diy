@@ -1,184 +1,130 @@
 #!/usr/bin/env node
 
-const { execSync, spawn } = require("child_process");
-const path = require("path");
-const fs = require("fs");
+import path from "path";
+import fs from "fs";
+import chalk from "chalk";
+import { banner, divider, info, fail as uiFail, warn } from "./lib/ui.js";
+import { scaffold } from "./lib/scaffold.js";
+import { runSetup } from "./lib/setup.js";
+import { resetConfig } from "./lib/reset.js";
 
-const REPO = "https://github.com/MattVOLTA/outworkos_diy.git";
+const DEFAULT_REPO = "https://github.com/MattVOLTA/outworkos_diy.git";
 
-// ── Colors ──────────────────────────────────────────────────
-const bold = (s) => `\x1b[1m${s}\x1b[0m`;
-const amber = (s) => `\x1b[33m${s}\x1b[0m`;
-const green = (s) => `\x1b[32m${s}\x1b[0m`;
-const dim = (s) => `\x1b[2m${s}\x1b[0m`;
-const red = (s) => `\x1b[31m${s}\x1b[0m`;
-
-// ── Helpers ─────────────────────────────────────────────────
-function fail(msg) {
-  console.error(`\n  ${red("Error:")} ${msg}\n`);
-  process.exit(1);
-}
-
-function check(cmd, label) {
-  try {
-    execSync(`command -v ${cmd}`, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
+function findProjectRoot(startDir) {
+  let dir = startDir;
+  while (true) {
+    if (fs.existsSync(path.join(dir, "outworkos.config.example.yaml"))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return null; // reached filesystem root
+    dir = parent;
   }
 }
 
-// ── Main ────────────────────────────────────────────────────
 async function main() {
-  const args = process.argv.slice(2).filter((a) => !a.startsWith("-"));
-  const flags = process.argv.slice(2).filter((a) => a.startsWith("-"));
+  const argv = process.argv.slice(2);
+  const flags = new Set(
+    argv.filter((a) => a.startsWith("--") || a.startsWith("-"))
+  );
+  const positional = argv.filter(
+    (a) => !a.startsWith("-") && !a.startsWith("--")
+  );
 
-  if (flags.includes("--help") || flags.includes("-h")) {
-    console.log(`
-  ${bold("create-outworkos")} ${dim("[directory]")}
+  // Parse --repo value
+  let repoUrl = DEFAULT_REPO;
+  const repoIdx = argv.indexOf("--repo");
+  if (repoIdx !== -1 && argv[repoIdx + 1]) {
+    repoUrl = argv[repoIdx + 1];
+  }
 
-  Scaffolds an Outwork OS workspace — a personal operating system
-  for knowledge workers, powered by Claude Code.
-
-  ${bold("Usage:")}
-    npx create-outworkos            ${dim("# creates ./outworkos")}
-    npx create-outworkos my-work    ${dim("# creates ./my-work")}
-
-  ${bold("Options:")}
-    --help, -h    Show this help message
-    --version     Show version
-`);
+  if (flags.has("--help") || flags.has("-h")) {
+    printHelp();
     process.exit(0);
   }
 
-  if (flags.includes("--version")) {
-    const pkg = require("./package.json");
+  if (flags.has("--version")) {
+    const pkg = JSON.parse(
+      fs.readFileSync(new URL("./package.json", import.meta.url), "utf-8")
+    );
     console.log(pkg.version);
     process.exit(0);
   }
 
-  const targetName = args[0] || "outworkos";
-  const targetDir = path.resolve(process.cwd(), targetName);
+  banner();
+  divider();
 
-  // ── Banner ──────────────────────────────────────────────
-  console.log();
-  console.log(`  ${amber("▐▌")} ${bold("Outwork OS")}`);
-  console.log(
-    `  ${dim("A personal operating system for knowledge workers")}`
-  );
-  console.log();
-
-  // ── Prerequisites ───────────────────────────────────────
-  if (!check("git")) {
-    fail("git is required but not found. Install it and try again.");
+  // Handle --reset before anything else
+  if (flags.has("--reset")) {
+    const cwd = process.cwd();
+    const resetRoot = findProjectRoot(cwd) || cwd;
+    await resetConfig(resetRoot);
+    divider();
+    info("Reset complete. Running setup from scratch...\n");
   }
 
-  if (process.platform !== "darwin") {
-    console.log(
-      `  ${amber("Warning:")} Outwork OS uses macOS Keychain for token storage.`
-    );
-    console.log(
-      `  ${dim("Some features may not work on this platform.")}`
-    );
-    console.log();
-  }
+  // Detect context: are we inside an existing Outwork OS clone?
+  const cwd = process.cwd();
+  const forceLocal = flags.has("--local") || flags.has("--reset") || flags.has("--check");
+  const projectRoot = forceLocal ? null : findProjectRoot(cwd);
 
-  // ── Check target ────────────────────────────────────────
-  if (fs.existsSync(targetDir)) {
-    const contents = fs.readdirSync(targetDir);
-    if (contents.length > 0) {
-      fail(
-        `Directory ${bold(targetName)} already exists and is not empty.\n         Choose a different name or remove it first.`
-      );
+  let projectDir;
+
+  if (forceLocal) {
+    // Treat cwd as the project root — skip scaffold, run setup directly
+    info(`Using current directory as project root: ${cwd}`);
+    projectDir = cwd;
+  } else if (projectRoot) {
+    if (projectRoot !== cwd) {
+      info(`Detected Outwork OS project at ${projectRoot}`);
+    } else {
+      info("Detected existing Outwork OS clone. Skipping scaffold.");
     }
-  }
-
-  // ── Clone ───────────────────────────────────────────────
-  console.log(`  ${dim("Cloning into")} ${bold(targetName)}${dim("...")}`);
-
-  try {
-    execSync(`git clone --depth 1 ${REPO} "${targetDir}"`, {
-      stdio: ["ignore", "ignore", "pipe"],
-    });
-  } catch (err) {
-    fail(`Failed to clone repository.\n         ${err.stderr?.toString().trim() || "Check your network connection."}`);
-  }
-
-  // Remove the .git directory so the user starts fresh
-  const gitDir = path.join(targetDir, ".git");
-  if (fs.existsSync(gitDir)) {
-    fs.rmSync(gitDir, { recursive: true, force: true });
-  }
-
-  // Initialize a fresh git repo
-  try {
-    execSync("git init", { cwd: targetDir, stdio: "ignore" });
-    execSync("git add -A", { cwd: targetDir, stdio: "ignore" });
-    execSync('git commit -m "Initial commit from create-outworkos"', {
-      cwd: targetDir,
-      stdio: "ignore",
-    });
-  } catch {
-    // Non-fatal — user can init git themselves
-  }
-
-  console.log(`  ${green("Done.")} Outwork OS scaffolded.\n`);
-
-  // ── Run setup ───────────────────────────────────────────
-  const setupScript = path.join(targetDir, "setup.sh");
-  if (fs.existsSync(setupScript)) {
-    console.log(`  ${dim("Running interactive setup...")}\n`);
-
-    // Make sure it's executable
-    try {
-      fs.chmodSync(setupScript, 0o755);
-    } catch {
-      // ignore
-    }
-
-    const setup = spawn("bash", [setupScript], {
-      cwd: targetDir,
-      stdio: "inherit",
-    });
-
-    setup.on("close", (code) => {
-      console.log();
-      if (code === 0) {
-        printNextSteps(targetName);
-      } else {
-        console.log(
-          `  ${amber("Setup exited with code " + code + ".")} You can re-run it anytime:`
-        );
-        console.log(`  ${bold(`cd ${targetName} && ./setup.sh`)}\n`);
-      }
-    });
-
-    setup.on("error", () => {
-      console.log(
-        `  ${amber("Could not run setup automatically.")} Run it manually:`
-      );
-      console.log(`  ${bold(`cd ${targetName} && ./setup.sh`)}\n`);
-    });
+    projectDir = projectRoot;
   } else {
-    printNextSteps(targetName);
+    const targetName = positional[0] || "outworkos";
+    projectDir = path.resolve(cwd, targetName);
+    await scaffold({ targetDir: projectDir, repoUrl });
   }
+
+  console.log();
+
+  await runSetup({
+    projectDir,
+    checkOnly: flags.has("--check"),
+    skipGoogle: flags.has("--skip-google"),
+    skipTodoist: flags.has("--skip-todoist"),
+    skipOptional: flags.has("--skip-optional"),
+  });
 }
 
-function printNextSteps(dir) {
-  console.log(`  ${bold("Next steps:")}`);
-  console.log();
-  console.log(`  ${green("1.")} ${bold(`cd ${dir}`)}`);
-  console.log(`  ${green("2.")} Open Claude Code: ${bold("claude")}`);
-  console.log(
-    `  ${green("3.")} Try a command:    ${bold("/scan")}  ${dim("or")}  ${bold("/whats-next")}`
-  );
-  console.log();
-  console.log(
-    `  ${dim("Docs:")} https://github.com/MattVOLTA/outworkos_diy`
-  );
-  console.log();
+function printHelp() {
+  console.log(`
+  ${chalk.bold("create-outworkos")} ${chalk.dim("[directory]")}
+
+  Scaffolds and configures an Outwork OS workspace — a personal
+  operating system for knowledge workers, powered by Claude Code.
+
+  ${chalk.bold("Usage:")}
+    npx create-outworkos              ${chalk.dim("# creates ./outworkos + runs setup")}
+    npx create-outworkos my-work      ${chalk.dim("# creates ./my-work + runs setup")}
+    npx create-outworkos              ${chalk.dim("# (inside existing clone) runs setup only")}
+    npx create-outworkos --local      ${chalk.dim("# treat cwd as project root, run setup")}
+
+  ${chalk.bold("Options:")}
+    --local             Use current directory as project root (skip detection)
+    --check             Dry-run: report status, change nothing
+    --reset             Delete config, clear Keychain, then re-run setup from scratch
+    --repo <url>        Clone from custom repo (default: upstream)
+    --skip-google       Skip Google Workspace setup
+    --skip-todoist      Skip Todoist setup
+    --skip-optional     Skip all optional integrations
+    --help, -h          Show this help message
+    --version           Show version
+`);
 }
 
 main().catch((err) => {
-  fail(err.message);
+  console.error(`\n  ${chalk.red("Error:")} ${err.message}\n`);
+  process.exit(1);
 });
