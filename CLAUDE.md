@@ -63,12 +63,22 @@ You have full read access to all files across every discovered project:
 - **Drill down on demand.** The manifest has summaries; use `Read` to get full context when needed.
 - **Respect project boundaries.** Each project has its own CLAUDE.md with its own rules.
 
+## How to Use
+
+1. **Always run Claude from this repo** — skills are loaded from `skills/` via `.claude/commands/`
+2. **Create projects with `/setup-project <name>`** — creates a directory under `$OUTWORKOS_PARENT` with MCP config, template skills, and API connections
+3. **Project files live outside the repo** — by default in `~/.outworkos/projects/`. You can change this in `outworkos.config.yaml` (set `storage.home` and `storage.parent` to the repo path if you want everything in one place)
+4. **Use skills to manage work** — `/scan` for inbox, `/whats-next` for priorities, `/log` for session notes, `/context-map` for project setup
+
 ## Preferences
 
 - **Database-first**: All project data, signals, logs, memory, and config live in Supabase. Local files are generated artifacts.
 - **Vault for secrets**: Never store API keys or tokens in `.env` files or plaintext. Use `scripts/get-secret.sh <label>` to retrieve secrets at runtime. Use `scripts/set-secret.sh <label> <value> [description]` to store new secrets.
 - **Config-driven**: User identity, Supabase connection, and integration settings come from `outworkos.config.yaml`. Never hardcode emails, user IDs, project IDs, or file paths.
-- **Use environment variables** `$OUTWORKOS_ROOT` and `$OUTWORKOS_PARENT` — never hardcode absolute paths.
+- **Use environment variables** — never hardcode absolute paths:
+  - `$OUTWORKOS_ROOT` — this repo (scripts/, skills/, config)
+  - `$OUTWORKOS_HOME` — data directory (~/.outworkos)
+  - `$OUTWORKOS_PARENT` — project folders (~/.outworkos/projects)
 
 ## Core Integrations (Required)
 
@@ -99,10 +109,13 @@ outworkos_diy/
 ├── outworkos.config.example.yaml    ← Config template (copy and fill in)
 ├── outworkos.config.yaml            ← Your config (gitignored)
 ├── .mcp.json                        ← MCP server config (minimal, env-var based)
-├── migrations/
-│   ├── 001_core_schema.sql          ← Tables
-│   ├── 002_rls_policies.sql         ← Row-level security
-│   └── 003_vault_functions.sql      ← Vault wrapper functions
+├── create-outworkos/                ← Setup CLI (npx create-outworkos)
+├── supabase/
+│   ├── config.toml                  ← Supabase CLI config
+│   ├── vault_functions.sql          ← Vault wrapper functions (needs superuser)
+│   └── migrations/
+│       ├── 20260101000001_core_schema.sql      ← Tables
+│       └── 20260101000002_rls_policies.sql     ← Row-level security
 ├── scripts/
 │   ├── load-config.sh               ← Parse config YAML → env vars
 │   ├── outworkos-auth-login.sh      ← Supabase auth (stores in Keychain)

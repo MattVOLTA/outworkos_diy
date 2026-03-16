@@ -1,33 +1,53 @@
 ---
 name: setup-project
 description: "Bootstraps a new project directory with base configuration files, MCP servers, API connections, and template skills from OutworkOS. Use when setting up a new project, initializing a workspace, or configuring MCP integrations for a new directory."
+argument-hint: "<project-name>"
 ---
 
 # /setup-project
 
-Bootstrap a new project directory with base configuration files from `*outworkos` (the source of truth for shared skills and credentials).
+Bootstrap a new project directory under `$OUTWORKOS_PARENT` with base configuration files from `$OUTWORKOS_ROOT` (the OutworkOS repo — source of truth for shared skills and credentials).
+
+**Key concepts:**
+- `$OUTWORKOS_ROOT` — the OutworkOS repo (where you run Claude from, contains scripts/, skills/, .mcp.json)
+- `$OUTWORKOS_HOME` — data directory (e.g., ~/.outworkos)
+- `$OUTWORKOS_PARENT` — where project folders live (e.g., ~/.outworkos/projects/)
+- These CAN be the same directory if the user configures it that way
 
 ## Trigger
 
-User invokes `/setup-project`
+User invokes `/setup-project` or `/setup-project <project-name>`
 
 ## Steps
 
-### 1. Validate Environment
+### 1. Validate Environment & Create Project Directory
 
-- Confirm the current working directory is under `$OUTWORKOS_PARENT/`
-- Confirm it is NOT the template itself (`$OUTWORKOS_ROOT/`)
-- Confirm the template directory exists at `$OUTWORKOS_ROOT/`
-- Confirm these template files exist:
-  - `$OUTWORKOS_ROOT/.mcp.json`
-  - `$OUTWORKOS_ROOT/skills/context-map/`
-  - `$OUTWORKOS_ROOT/skills/log/`
-  - `$OUTWORKOS_ROOT/skills/todoist/`
-- If any validation fails, stop and explain what's wrong
+1. Confirm `$OUTWORKOS_ROOT` is set and the template directory exists with these files:
+   - `$OUTWORKOS_ROOT/.mcp.json`
+   - `$OUTWORKOS_ROOT/skills/context-map/`
+   - `$OUTWORKOS_ROOT/skills/log/`
+   - `$OUTWORKOS_ROOT/skills/todoist/`
+   If any are missing, warn but continue (some may not be needed).
+
+2. Confirm `$OUTWORKOS_PARENT` is set. If not, default to `$OUTWORKOS_HOME/projects` or ask the user.
+
+3. Get the project name:
+   - If provided as argument, use it
+   - Otherwise, ask: **"What's the name of this project?"**
+   - Slugify the name for the directory (lowercase, hyphens for spaces, strip special chars)
+
+4. Create the project directory at `$OUTWORKOS_PARENT/<slug>/`:
+   - If the directory **already exists and is not empty**, stop with an error: "Project directory already exists. Use a different name or remove it first."
+   - If the directory exists but is empty, proceed
+   - If it doesn't exist, create it with `mkdir -p`
+
+5. Set `PROJECT_DIR=$OUTWORKOS_PARENT/<slug>` for use in all subsequent steps.
+
+**Note:** The user runs Claude from `$OUTWORKOS_ROOT` (the repo) to get skills loaded. This step creates the project directory elsewhere — that's expected.
 
 ### 2. Check for Existing Files
 
-Check whether these already exist in the current project directory:
+Check whether these already exist in the project directory:
 - `.mcp.json`
 - `.claude/skills/context-map/`
 - `.claude/skills/log/`
@@ -45,35 +65,36 @@ Verify that `outwork init` has been run and Vault secrets are accessible. Test b
 
 If Vault access fails, tell the user to run `$OUTWORKOS_ROOT/scripts/outworkos-auth-login.sh` first.
 
-### 4. Copy Template Skills
+### 4. Link Skills and Hooks
 
-Copy template skills from `*outworkos/skills/` into `.claude/skills/` in the current project, preserving directory structure.
+Symlink key directories from `$OUTWORKOS_ROOT` into the project so skills, hooks, and environment variables work when running Claude from the project directory.
 
-**Important**: The asterisk in `*outworkos` causes issues with glob patterns. Use `find` via Bash to discover files instead of the Glob tool for paths under this directory.
+```bash
+mkdir -p "$PROJECT_DIR/.claude"
 
-**context-map skill:**
+# Skills — makes all /commands available
+ln -sf "$OUTWORKOS_ROOT/skills" "$PROJECT_DIR/.claude/commands"
 
-Check for files under `$OUTWORKOS_ROOT/skills/context-map/`:
-- If found, create `.claude/skills/context-map/` in the current project
-- Copy all files (SKILL.md, reference/, etc.) preserving directory structure
+# Hooks — SessionStart sets $OUTWORKOS_ROOT, $OUTWORKOS_HOME, $OUTWORKOS_PARENT
+ln -sf "$OUTWORKOS_ROOT/.claude/hooks" "$PROJECT_DIR/.claude/hooks"
 
-If the skill does NOT exist in `*outworkos`, skip silently.
+# Settings — hook config (SessionStart, SessionEnd)
+# Copy (not symlink) so the project can customize hooks later
+if [ ! -f "$PROJECT_DIR/.claude/settings.json" ]; then
+  cp "$OUTWORKOS_ROOT/.claude/settings.json" "$PROJECT_DIR/.claude/settings.json"
+fi
+```
 
-**log skill:**
+This ensures:
+- All skills are available (context-map, log, todoist, scan, whats-next, etc.)
+- `$OUTWORKOS_ROOT`, `$OUTWORKOS_HOME`, `$OUTWORKOS_PARENT` are set on session start
+- Vault scripts (`get-secret.sh`, `set-secret.sh`) are reachable via `$OUTWORKOS_ROOT/scripts/`
+- Stays in sync with the repo — no need to copy or update individual files
 
-Check for files under `$OUTWORKOS_ROOT/skills/log/`:
-- If found, create `.claude/skills/log/` in the current project
-- Copy all files (SKILL.md, etc.) preserving directory structure
-
-If the skill does NOT exist in `*outworkos`, skip silently.
-
-**todoist skill:**
-
-Check for files under `$OUTWORKOS_ROOT/skills/todoist/`:
-- If found, create `.claude/skills/todoist/` in the current project
-- Copy all files (SKILL.md) preserving directory structure
-
-If the skill does NOT exist in `*outworkos`, skip silently.
+If `.claude/commands` or `.claude/hooks` already exists:
+- If it's a symlink pointing to the same target, skip
+- If it's a symlink pointing elsewhere, ask the user before replacing
+- If it's a regular directory, ask the user whether to replace it with a symlink
 
 ### 5. Supabase Picker (Optional)
 
@@ -320,26 +341,23 @@ Confirm all created files exist by reading them. Then print a summary:
 ```
 Project setup complete!
 
+Directory: $OUTWORKOS_PARENT/<project-name>/
+
 Files created:
   .mcp.json
-  .claude/skills/context-map/  ← only if it was copied from template
-  .claude/skills/log/          ← only if it was copied from template
-  .claude/skills/todoist/      ← only if it was copied from template
+  .claude/commands → $OUTWORKOS_ROOT/skills/  (symlink — all skills available)
 
 Connection tests:
   ✓ GitHub
-  ✓ Netlify
-  ✓ Perplexity
   ✓ Supabase
-  ✓ Fireflies
-  ✓ Context7
   · Google Workspace (OAuth — tested on first use)
+  ...
 
 MCP servers configured:
-  github, netlify, context7, perplexity, fireflies, google-workspace[, supabase-projects...]
+  supabase, google-workspace, github, ...
 
 GitHub backup:
-  ✓ Repo: github.com/MattVOLTA/<repo-name> (private)
+  ✓ Repo: github.com/<user>/<repo-name> (private)
   ✓ SessionEnd hook: .claude/hooks/backup.sh
 ```
 
@@ -351,11 +369,4 @@ GitHub backup:
 
 Use ✓ for passed, ✗ for failed (with note), · for skipped/untestable.
 
-**Conditional next step:**
-- If `.claude/skills/context-map/SKILL.md` was copied into the project → suggest: "Run `/context-map` to configure this project."
-- If context-map was NOT available in the template → say: "Setup complete. The `/context-map` skill isn't in the template yet — it will be available once it's been created there."
-
-Do NOT suggest running `/context-map` if it wasn't copied into the project.
-
-**Skills copied:**
-- List which template skills were copied (context-map, log, todoist) and which were skipped or not found in the template.
+**Next step:** Suggest: "Run `cd $OUTWORKOS_PARENT/<project-name> && claude` then `/context-map` to configure this project."

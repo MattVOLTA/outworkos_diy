@@ -6,11 +6,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Load config for OUTWORKOS_ROOT, OUTWORKOS_PARENT, SUPABASE_URL
+# Load config for OUTWORKOS_ROOT, OUTWORKOS_HOME, OUTWORKOS_PARENT, SUPABASE_URL
 source "$REPO_ROOT/scripts/load-config.sh" 2>/dev/null || true
 
 SD="${OUTWORKOS_PARENT:-$(cd "$REPO_ROOT/.." && pwd)}"
 _OUTWORKOS_ROOT="${OUTWORKOS_ROOT:-$REPO_ROOT}"
+_OUTWORKOS_HOME="${OUTWORKOS_HOME:-$REPO_ROOT}"
 MANIFEST=""
 COUNT=0
 SOURCE="filesystem"
@@ -18,6 +19,7 @@ SOURCE="filesystem"
 # Export key env vars so they're available in-session
 if [ -n "$CLAUDE_ENV_FILE" ]; then
   echo "OUTWORKOS_ROOT=${_OUTWORKOS_ROOT}" >> "$CLAUDE_ENV_FILE"
+  echo "OUTWORKOS_HOME=${_OUTWORKOS_HOME}" >> "$CLAUDE_ENV_FILE"
   echo "OUTWORKOS_PARENT=${SD}" >> "$CLAUDE_ENV_FILE"
 fi
 
@@ -25,6 +27,8 @@ fi
 _SUPABASE_URL="${SUPABASE_URL:-}"
 KEYCHAIN_SERVICE="outworkos"
 _SUPABASE_KEY=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a service_role_key -w 2>/dev/null) || true
+
+_DB_COUNT_FILE=$(mktemp)
 
 if [ -n "$_SUPABASE_KEY" ] && [ -n "$_SUPABASE_URL" ]; then
     DB_RESP=$(curl -s --max-time 5 \
@@ -34,14 +38,14 @@ if [ -n "$_SUPABASE_KEY" ] && [ -n "$_SUPABASE_URL" ]; then
       -H "Content-Type: application/json" \
       -d '{}' 2>/dev/null)
 
-    # Parse DB response — if valid JSON array with at least one entry, use it
-    DB_MANIFEST=$(python3 -c "
+    # Parse DB response — passed via stdin and sys.argv (no shell interpolation in Python)
+    DB_MANIFEST=$(echo "$DB_RESP" | python3 -c "
 import json, sys, os
 try:
-    projects = json.loads('''$DB_RESP''')
+    projects = json.loads(sys.stdin.read())
     if not isinstance(projects, list) or len(projects) == 0:
         sys.exit(1)
-    sd = '$SD'
+    sd = sys.argv[1]
     count = 0
     for p in projects:
         name = p.get('name', '')
@@ -69,15 +73,15 @@ try:
     print(f'COUNT={count}', file=sys.stderr)
 except Exception as e:
     sys.exit(1)
-" 2>/tmp/_outwork_db_count)
+" "$SD" 2>"$_DB_COUNT_FILE")
 
     if [ $? -eq 0 ] && [ -n "$DB_MANIFEST" ]; then
       MANIFEST="$DB_MANIFEST"
-      COUNT=$(grep -o 'COUNT=[0-9]*' /tmp/_outwork_db_count 2>/dev/null | cut -d= -f2)
+      COUNT=$(grep -o 'COUNT=[0-9]*' "$_DB_COUNT_FILE" 2>/dev/null | cut -d= -f2)
       COUNT=${COUNT:-0}
       SOURCE="supabase"
     fi
-    rm -f /tmp/_outwork_db_count
+    rm -f "$_DB_COUNT_FILE"
 fi
 
 # --- Fallback: filesystem scan (original behavior) ---
