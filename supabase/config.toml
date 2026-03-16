@@ -1,0 +1,7 @@
+# Outwork OS — Supabase CLI configuration
+# https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "outworkos"
+
+[db]
+major_version = 17
