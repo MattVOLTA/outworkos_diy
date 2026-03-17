@@ -1,6 +1,7 @@
 {
   "name": "create-outworkos",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "type": "module",
   "description": "Set up Outwork OS — a personal operating system for knowledge workers, powered by Claude Code.",
   "license": "MIT",
   "repository": {
@@ -12,7 +13,8 @@
     "create-outworkos": "./index.js"
   },
   "files": [
-    "index.js"
+    "index.js",
+    "lib/**/*.js"
   ],
   "keywords": [
     "outworkos",
@@ -24,5 +26,11 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "inquirer": "^12.6.0",
+    "js-yaml": "^4.1.0",
+    "ora": "^8.2.0"
   }
 }

@@ -9,6 +9,11 @@
 # Usage:
 #   ./setup.sh              # Interactive setup
 #   ./setup.sh --check      # Dry-run: report status, change nothing
+#
+# NOTE: This script is maintained for backwards compatibility.
+# The recommended setup method is: npx create-outworkos
+# The Node.js version uses fetch() instead of curl, avoiding
+# exposure of secrets in the process table.
 # ============================================================
 
 set -euo pipefail
@@ -54,6 +59,8 @@ prompt_or_default() {
 }
 
 # Read a YAML scalar value (simple grep — works for the flat config)
+# NOTE: A similar parser exists in scripts/load-config.sh. The canonical
+# implementation is in create-outworkos/lib/yaml-config.js (uses js-yaml).
 yaml_get() {
   local file="$1" key="$2"
   python3 -c "
@@ -109,9 +116,9 @@ yaml_set() {
   python3 -c "
 import re, sys
 
-key_parts = '$key'.split('.')
-value = '''$value'''
-file_path = '$file'
+key_parts = sys.argv[1].split('.')
+value = sys.argv[2]
+file_path = sys.argv[3]
 
 with open(file_path) as f:
     lines = f.readlines()
@@ -151,7 +158,7 @@ if not found:
 
 with open(file_path, 'w') as f:
     f.writelines(lines)
-" 2>/dev/null
+" "$key" "$value" "$file" 2>/dev/null
 }
 
 # Check if a Keychain entry exists
@@ -412,7 +419,7 @@ else
       fail "Core tables may not exist (HTTP $TABLE_CHECK)"
     else
       info "Running migrations..."
-      for migration in "$SCRIPT_DIR"/migrations/*.sql; do
+      for migration in "$SCRIPT_DIR"/supabase/migrations/*.sql; do
         migration_name="$(basename "$migration")"
         SQL=$(cat "$migration")
 
@@ -444,7 +451,11 @@ except:
     print('ok')
 " 2>/dev/null || echo "ok")
 
-        ok "$migration_name applied (idempotent)"
+        if [ "$HTTP_CODE" = "error" ]; then
+          fail "$migration_name failed — run manually in SQL Editor"
+        else
+          ok "$migration_name applied (idempotent)"
+        fi
       done
       info "Note: If migrations fail, run them manually in Supabase SQL Editor"
     fi
