@@ -13,7 +13,8 @@ SUPABASE_URL="${SUPABASE_URL:?ERROR: SUPABASE_URL not set. Configure outworkos.c
 KEYCHAIN_SERVICE="outworkos"
 
 LABEL="${1:?Usage: set-secret.sh <label> <value> [description]}"
-SECRET="${2:?Usage: set-secret.sh <label> <value> [description]}"
+# Accept secret via OUTWORKOS_INLINE_SECRET env var (preferred, avoids ps exposure) or $2
+SECRET="${OUTWORKOS_INLINE_SECRET:-${2:?Usage: set-secret.sh <label> <value> [description]}}"
 DESCRIPTION="${3:-}"
 
 SERVICE_KEY=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a service_role_key -w 2>/dev/null)
@@ -29,23 +30,36 @@ if [ -z "$USER_ID" ]; then
   exit 1
 fi
 
-# Use Python for safe JSON serialization (API keys may contain special chars)
-python3 -c "
-import json, urllib.request, sys
+# Use Python for safe JSON serialization — secrets passed via env vars (not visible in ps)
+OUTWORKOS_VAULT_USER_ID="$USER_ID" \
+OUTWORKOS_VAULT_LABEL="$LABEL" \
+OUTWORKOS_VAULT_SECRET="$SECRET" \
+OUTWORKOS_VAULT_DESCRIPTION="$DESCRIPTION" \
+OUTWORKOS_VAULT_SERVICE_KEY="$SERVICE_KEY" \
+OUTWORKOS_VAULT_SUPABASE_URL="$SUPABASE_URL" \
+python3 << 'PYEOF'
+import json, urllib.request, os, sys
+
+user_id = os.environ['OUTWORKOS_VAULT_USER_ID']
+label = os.environ['OUTWORKOS_VAULT_LABEL']
+secret = os.environ['OUTWORKOS_VAULT_SECRET']
+description = os.environ['OUTWORKOS_VAULT_DESCRIPTION']
+service_key = os.environ['OUTWORKOS_VAULT_SERVICE_KEY']
+supabase_url = os.environ['OUTWORKOS_VAULT_SUPABASE_URL']
 
 payload = json.dumps({
-    'p_user_id': '$USER_ID',
-    'p_name': '$LABEL',
-    'p_secret': sys.argv[1],
-    'p_description': sys.argv[2]
+    'p_user_id': user_id,
+    'p_name': label,
+    'p_secret': secret,
+    'p_description': description
 }).encode()
 
 req = urllib.request.Request(
-    '$SUPABASE_URL/rest/v1/rpc/store_secret_by_label',
+    supabase_url + '/rest/v1/rpc/store_secret_by_label',
     data=payload,
     headers={
-        'apikey': sys.argv[3],
-        'Authorization': 'Bearer ' + sys.argv[3],
+        'apikey': service_key,
+        'Authorization': 'Bearer ' + service_key,
         'Content-Type': 'application/json'
     },
     method='POST'
@@ -55,9 +69,9 @@ try:
     with urllib.request.urlopen(req) as resp:
         result = resp.read().decode()
         vault_id = json.loads(result)
-        print(f'Stored: $LABEL (vault_id: {vault_id})')
+        print(f'Stored: {label} (vault_id: {vault_id})')
 except urllib.error.HTTPError as e:
     body = e.read().decode()
     print(f'Error storing secret: {e.code} {body}', file=sys.stderr)
     sys.exit(1)
-" "$SECRET" "$DESCRIPTION" "$SERVICE_KEY"
+PYEOF

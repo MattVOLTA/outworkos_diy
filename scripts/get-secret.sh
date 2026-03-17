@@ -29,28 +29,32 @@ if [ -z "$USER_ID" ]; then
   exit 1
 fi
 
+# Build JSON payload safely via Python
+RPC_PAYLOAD=$(python3 -c "import json,sys; print(json.dumps({'p_user_id':sys.argv[1],'p_name':sys.argv[2]}))" "$USER_ID" "$LABEL")
+
 # Call PostgREST RPC
 RESPONSE=$(curl -sf --max-time 10 \
   -X POST "${SUPABASE_URL}/rest/v1/rpc/get_secret_by_label" \
   -H "apikey: ${SERVICE_KEY}" \
   -H "Authorization: Bearer ${SERVICE_KEY}" \
   -H "Content-Type: application/json" \
-  -d "{\"p_user_id\": \"${USER_ID}\", \"p_name\": \"${LABEL}\"}" 2>/dev/null) || {
+  -d "$RPC_PAYLOAD" 2>/dev/null) || {
   echo "Error: Failed to connect to Supabase Vault" >&2
   exit 1
 }
 
-# Parse JSON response via stdin (safe — no shell interpolation)
+# Parse JSON response — label passed via sys.argv (no shell interpolation in Python)
 echo "$RESPONSE" | python3 -c "
 import json, sys
+label = sys.argv[1]
 raw = sys.stdin.read().strip()
 try:
     val = json.loads(raw)
     if val is None:
-        print(f'Error: Secret \"${LABEL}\" not found in Vault', file=sys.stderr)
+        print(f'Error: Secret \"{label}\" not found in Vault', file=sys.stderr)
         sys.exit(1)
     print(val, end='')
 except json.JSONDecodeError:
     print(f'Error: Invalid response from Vault: {raw[:200]}', file=sys.stderr)
     sys.exit(1)
-"
+" "$LABEL"
