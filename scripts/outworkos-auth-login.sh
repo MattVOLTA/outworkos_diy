@@ -14,27 +14,32 @@ SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:?ERROR: SUPABASE_ANON_KEY not set. Config
 KEYCHAIN_SERVICE="outworkos-cli"
 
 # Support env vars for non-interactive use
-if [ -n "$OUTWORK_USER_EMAIL" ]; then
-  EMAIL="$OUTWORK_USER_EMAIL"
+if [ -n "$OUTWORKOS_USER_EMAIL" ]; then
+  EMAIL="$OUTWORKOS_USER_EMAIL"
 else
   printf "Email: "
   read -r EMAIL
 fi
 
-if [ -n "$OUTWORK_USER_PASSWORD" ]; then
-  PASSWORD="$OUTWORK_USER_PASSWORD"
+if [ -n "$OUTWORKOS_USER_PASSWORD" ]; then
+  PASSWORD="$OUTWORKOS_USER_PASSWORD"
 else
   printf "Password: "
   read -rs PASSWORD
   echo
 fi
 
-# Authenticate with Supabase
-RESPONSE=$(curl -s -w "\n%{http_code}" \
+# Build JSON payload safely via Python — credentials passed via env vars (not visible in ps)
+AUTH_PAYLOAD=$(OUTWORKOS_LOGIN_EMAIL="$EMAIL" OUTWORKOS_LOGIN_PASSWORD="$PASSWORD" python3 -c "
+import json, os
+print(json.dumps({'email': os.environ['OUTWORKOS_LOGIN_EMAIL'], 'password': os.environ['OUTWORKOS_LOGIN_PASSWORD']}))")
+
+# Authenticate with Supabase — pass payload via stdin to avoid exposing it in ps
+RESPONSE=$(echo "$AUTH_PAYLOAD" | curl -s -w "\n%{http_code}" \
   -X POST "${SUPABASE_URL}/auth/v1/token?grant_type=password" \
   -H "Content-Type: application/json" \
   -H "apikey: ${SUPABASE_ANON_KEY}" \
-  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")
+  --data-binary @-)
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 BODY=$(echo "$RESPONSE" | sed '$d')
@@ -52,8 +57,8 @@ EXPIRES_IN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.std
 USER_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['user']['id'])")
 USER_EMAIL=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['user']['email'])")
 
-# Calculate expires_at (milliseconds since epoch)
-EXPIRES_AT=$(python3 -c "import time; print(int(time.time() * 1000 + ${EXPIRES_IN} * 1000))")
+# Calculate expires_at (Unix seconds — standard convention)
+EXPIRES_AT=$(python3 -c "import time; print(int(time.time() + ${EXPIRES_IN}))")
 
 # Store in macOS Keychain
 security add-generic-password -s "$KEYCHAIN_SERVICE" -a access_token  -w "$ACCESS_TOKEN"  -U
