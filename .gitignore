@@ -37,3 +37,6 @@ venv/
 
 # Local Netlify folder
 .netlify
+
+# Supabase local temp files (contain project ref and connection strings)
+supabase/.temp/
