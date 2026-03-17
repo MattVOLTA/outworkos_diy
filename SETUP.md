@@ -1,117 +1,91 @@
 # Outwork OS Setup Guide
 
+## Quick Start
+
+```bash
+npx create-outworkos
+```
+
+This single command scaffolds and configures everything. It's idempotent — safe to re-run at any time.
+
+## From a Fork (Recommended)
+
+1. **Fork** [outworkos_diy](https://github.com/MattVOLTA/outworkos_diy) on GitHub
+2. **Clone** your fork:
+   ```bash
+   git clone https://github.com/YOU/outworkos_diy.git
+   cd outworkos_diy
+   ```
+3. **Run setup:**
+   ```bash
+   npx create-outworkos
+   ```
+   The tool detects you're inside an existing clone and skips the scaffold step.
+
+4. **Pull upstream updates** anytime:
+   ```bash
+   git remote add upstream https://github.com/MattVOLTA/outworkos_diy.git
+   git pull upstream main
+   ```
+
 ## Prerequisites
 
 - **macOS** (Keychain is used for token storage)
-- **Claude Code** CLI installed
+- **Node.js 18+** (for the setup tool)
 - **Python 3** (ships with macOS)
-- **Supabase** account (free tier works)
+- **Supabase** account ([free tier works](https://supabase.com))
+
+### Optional (recommended)
+
+- **Supabase CLI** — enables automated project creation and migration ([install](https://supabase.com/docs/guides/cli))
+- **Claude Code** CLI ([install](https://claude.ai/code))
 - **Google Cloud** account (for Gmail, Calendar, Contacts, Drive APIs)
 - **Todoist** account
 
-## Step 1: Clone and Configure
+## What You'll Need Ready
+
+Before running setup, have these accounts/credentials available:
+
+| Integration | What you need | Where to get it |
+|---|---|---|
+| Supabase | Project ID, URL, anon key, service role key | [Dashboard > Settings > API](https://supabase.com/dashboard) |
+| Google Workspace (full mode) | OAuth Client ID + Secret | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+| Todoist | API token | [Developer settings](https://todoist.com/app/settings/integrations/developer) |
+
+## Flags
 
 ```bash
-git clone https://github.com/yourorg/outworkos_diy.git
-cd outworkos_diy
-cp outworkos.config.example.yaml outworkos.config.yaml
+npx create-outworkos                  # Full setup
+npx create-outworkos my-workspace     # Custom directory name
+npx create-outworkos --check          # Dry-run: report status, change nothing
+npx create-outworkos --skip-google    # Skip Google Workspace
+npx create-outworkos --skip-todoist   # Skip Todoist
+npx create-outworkos --skip-optional  # Skip optional integrations
+npx create-outworkos --repo <url>     # Clone from custom repo
 ```
 
-Edit `outworkos.config.yaml` with your details:
+## What Setup Does
 
-```yaml
-user:
-  email: "you@company.com"
-  name: "Your Name"
-  timezone: "America/New_York"
-  domain: "company.com"
+| Step | Description |
+|---|---|
+| 0 | Check prerequisites (macOS, Python 3, curl) |
+| 1 | Create config file from template |
+| 2 | Collect user identity (email, name, timezone) |
+| 3 | Set storage paths |
+| 4 | Configure Supabase (CLI or dashboard) |
+| 5 | Store service role key in Keychain |
+| 6 | Create auth user + login |
+| 7 | Run database migrations |
+| 8 | Create user profile |
+| 9 | Google Workspace (OAuth credentials + authorization) |
+| 10 | Todoist (API token) |
+| 11 | Optional integrations |
+| 12 | Fix file permissions |
+| 13 | Verification |
 
-supabase:
-  project_id: "your-project-id"
-  url: "https://your-project-id.supabase.co"
-  anon_key: "your-anon-key"
+## Google Workspace Modes
 
-storage:
-  root: "/path/to/outworkos_diy"
-  parent: "/path/to/your/projects"
-```
-
-## Step 2: Set Up Supabase
-
-### Create a Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Note your **Project ID**, **URL**, and **anon key** from Settings > API
-3. Add these to your `outworkos.config.yaml`
-
-### Enable Vault
-
-1. In Supabase Dashboard, go to **Database > Extensions**
-2. Enable the `supabase_vault` extension
-
-### Run Migrations
-
-Run the migrations in order via the Supabase SQL Editor (Dashboard > SQL Editor):
-
-1. Paste and run `migrations/001_core_schema.sql`
-2. Paste and run `migrations/002_rls_policies.sql`
-3. Paste and run `migrations/003_vault_functions.sql`
-
-### Create Your User
-
-1. In Supabase Dashboard, go to **Authentication > Users**
-2. Click "Add User" and create your account with email/password
-3. Note your **User ID** from the user details
-
-### Store Service Role Key
-
-The service role key allows scripts to access Vault. Find it in Settings > API > `service_role` key.
-
-```bash
-security add-generic-password -s outworkos -a service_role_key -w "your-service-role-key" -U
-```
-
-## Step 3: Authenticate
-
-```bash
-./scripts/outworkos-auth-login.sh
-```
-
-Enter your Supabase email and password. Tokens are stored in macOS Keychain.
-
-## Step 4: Create Your User Profile
-
-Open Claude Code in the `outworkos_diy` directory and run:
-
-```
-Use the Supabase MCP to insert a row into user_profiles with my email, name, timezone, and domain from the config.
-```
-
-Or run this SQL in the Supabase SQL Editor (replace values):
-
-```sql
-INSERT INTO user_profiles (user_id, email, display_name, domain, timezone)
-VALUES (
-  'your-user-id',
-  'you@company.com',
-  'Your Name',
-  'company.com',
-  'America/New_York'
-);
-```
-
-## Step 5: Set Up Google Workspace
-
-### Choose Your Mode
-
-Outwork OS supports two Google Workspace modes. Set `mode` in your config:
-
-```yaml
-integrations:
-  google_workspace:
-    enabled: true
-    mode: "quick"    # or "full"
-```
+Outwork OS supports two Google Workspace modes:
 
 | | Quick Mode | Full Mode |
 |---|---|---|
@@ -119,126 +93,121 @@ integrations:
 | **Gmail read** | Yes (search, read, threads) | Yes |
 | **Gmail draft** | Yes (create drafts) | Yes (with signature auto-append) |
 | **Gmail send** | No — draft only, send from Gmail | Yes (programmatic send) |
-| **Gmail archive** | No — /scan reports noise but can't auto-archive | Yes (auto-archive noise and resolved emails) |
-| **Calendar** | Full (list, create, update, delete, find times) | Full |
+| **Gmail archive** | No | Yes (auto-archive noise and resolved emails) |
+| **Calendar** | Full | Full |
 | **Contacts** | No | Yes (read + write-back enrichment) |
 | **Drive** | No | Yes |
 
-### Quick Mode (Recommended for Getting Started)
+Set `mode` in your config: `quick` (default, zero setup) or `full` (requires Google Cloud Console credentials).
 
-No setup needed. The built-in Anthropic Gmail and Calendar connectors are available automatically in Claude Code. **Skip to Step 6.**
+## After Setup
 
-You can upgrade to full mode at any time by completing the full mode steps below and changing `mode: "full"` in your config.
+Once setup is complete, open Claude Code **from the repo directory** (this is where skills are loaded):
 
-### Full Mode
+```bash
+cd /path/to/outworkos_diy
+claude
+```
 
-#### Create OAuth Credentials
+### Create your first project
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or use an existing one)
-3. Enable these APIs:
-   - Gmail API
-   - Google Calendar API
-   - People API (Contacts)
-   - Google Drive API
-4. Go to **APIs & Services > Credentials**
-5. Create an **OAuth 2.0 Client ID** (type: Desktop app)
-6. Add `http://localhost:5555/oauth/callback` as an authorized redirect URI
-7. Note the **Client ID** and **Client Secret**
+```
+/setup-project my-project
+```
 
-#### Store Google Credentials in Vault
+This creates `~/.outworkos/projects/my-project/` with MCP servers, template skills, and API connections.
+
+### Directory structure
+
+```
+outworkos_diy/              ← $OUTWORKOS_ROOT (the repo — run Claude here)
+├── scripts/                  Scripts, config, skills
+├── skills/                   Skill definitions (symlinked to .claude/commands/)
+├── outworkos.config.yaml     Your configuration
+└── .mcp.json                 MCP server config (generated by setup)
+
+~/.outworkos/               ← $OUTWORKOS_HOME (data directory)
+└── projects/               ← $OUTWORKOS_PARENT (project folders)
+    ├── project-a/            Created by /setup-project
+    ├── project-b/
+    └── ...
+```
+
+You can set `storage.home` and `storage.parent` in `outworkos.config.yaml` to point anywhere — including the repo itself if you want everything in one place.
+
+## Manual Setup (Without the Script)
+
+### 1. Clone and Configure
+
+```bash
+git clone https://github.com/MattVOLTA/outworkos_diy.git
+cd outworkos_diy
+cp outworkos.config.example.yaml outworkos.config.yaml
+```
+
+Edit `outworkos.config.yaml` with your details.
+
+### 2. Set Up Supabase
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Note your Project ID, URL, and anon key from Settings > API
+3. Enable the `supabase_vault` extension (Database > Extensions)
+4. Run migrations in order via SQL Editor:
+   - `supabase/migrations/20260101000001_core_schema.sql`
+   - `supabase/migrations/20260101000002_rls_policies.sql`
+   - `supabase/vault_functions.sql` (requires superuser — run via SQL Editor or Management API)
+5. Store your service role key in Keychain:
+   ```bash
+   security add-generic-password -s outworkos -a service_role_key -w "your-key" -U
+   ```
+
+### 3. Create Auth User
+
+In Supabase Dashboard > Authentication > Users, click "Add User" with your email/password.
+
+### 4. Authenticate
+
+```bash
+./scripts/outworkos-auth-login.sh
+```
+
+### 5. Google Workspace (Full Mode)
 
 ```bash
 ./scripts/set-secret.sh google_client_id "your-client-id"
 ./scripts/set-secret.sh google_client_secret "your-client-secret"
+./scripts/google-auth.sh
 ```
 
-#### Authorize Google
+### 6. Todoist
 
+```bash
+./scripts/set-secret.sh todoist_api_token "your-token"
+```
+
+### 7. Verify
+
+Open Claude Code in the directory. The SessionStart hook should load your project manifest.
+
+## Troubleshooting
+
+### Re-run setup
+```bash
+npx create-outworkos --check    # See what's missing
+npx create-outworkos            # Fix it
+```
+
+### "Not authenticated" error
+```bash
+./scripts/outworkos-auth-login.sh
+```
+
+### Google OAuth token expired
 ```bash
 ./scripts/google-auth.sh
 ```
 
-This opens your browser for OAuth consent. The refresh token is stored in Vault automatically.
-
-#### Add Google Workspace MCP
-
-Add to your `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "google-workspace": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/google-workspace-mcp"],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "${GOOGLE_OAUTH_CLIENT_ID}",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "${GOOGLE_OAUTH_CLIENT_SECRET}"
-      }
-    }
-  }
-}
-```
-
-## Step 6: Set Up Todoist
-
-1. Get your Todoist API token from [todoist.com/app/settings/integrations/developer](https://todoist.com/app/settings/integrations/developer)
-2. Store it in Vault:
-
-```bash
-./scripts/set-secret.sh todoist_api_token "your-todoist-api-token"
-```
-
-## Step 7: Optional Integrations
-
-Enable any of these in `outworkos.config.yaml` and store their API keys in Vault:
-
-### GitHub
-
-```bash
-./scripts/set-secret.sh github_token "ghp_your-token"
-```
-
-Update `.mcp.json` to reference `${GITHUB_TOKEN}` environment variable.
-
-### Fireflies
-
-```bash
-./scripts/set-secret.sh fireflies_api_key "your-api-key"
-```
-
-### Pushover (Push Notifications)
-
-```bash
-./scripts/set-secret.sh pushover_user_key "your-user-key"
-./scripts/set-secret.sh pushover_app_token "your-app-token"
-```
-
-### Other Integrations
-
-For each integration, store the API key in Vault using `set-secret.sh` and update the `.mcp.json` if an MCP server is needed.
-
-## Step 8: Verify
-
-Open Claude Code in the `outworkos_diy` directory. You should see the project manifest load at session start. Try:
-
-- `/scan` — Scan your inbox
-- `/whats-next` — See what to work on
-- `/log` — Log a session
-
-## Troubleshooting
-
-### "Not authenticated" error
-Run `./scripts/outworkos-auth-login.sh` to re-authenticate.
-
-### "No service_role_key in Keychain" error
-Store the Supabase service role key:
+### "No service_role_key in Keychain"
 ```bash
 security add-generic-password -s outworkos -a service_role_key -w "your-key" -U
 ```
-
-### Google OAuth token expired
-Run `./scripts/google-auth.sh` to re-authorize.
-
-### Skills can't find user profile
-Ensure you created a row in `user_profiles` (Step 4).

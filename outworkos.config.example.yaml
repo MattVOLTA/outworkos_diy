@@ -16,16 +16,16 @@ supabase:
   anon_key: ""                     # Public anon key (safe to store here — it's not a secret)
 
 storage:
-  root: ""                         # Absolute path to this repo (e.g., /Users/you/outworkos_diy)
-  parent: ""                       # Parent directory for all project folders (e.g., /Users/you/projects)
+  home: ""                         # Data directory (e.g., ~/.outworkos) — for project folders and user data
+  parent: ""                       # Parent directory for all project folders (e.g., ~/.outworkos/projects)
 
 # === CORE INTEGRATIONS (required) ===
 
 integrations:
   google_workspace:
     enabled: true
-    mode: "quick"                  # "quick" = Anthropic built-in connectors (zero setup, read + draft only)
-                                   # "full"  = Custom OAuth (Gmail send/archive, Contacts, Drive — requires Google Cloud Console)
+    mode: "full"                   # "full"  = Custom OAuth (Gmail send/archive, Contacts, Drive — requires Google Cloud Console)
+                                   # "quick" = Anthropic built-in connectors (zero setup, read + draft only)
     client_id: ""                  # Full mode only — from Google Cloud Console OAuth 2.0 credentials
     client_secret: ""              # Full mode only — from Google Cloud Console OAuth 2.0 credentials
     redirect_port: 5555            # Full mode only — local port for OAuth callback
@@ -67,6 +67,9 @@ integrations:
 
   context7:
     enabled: false
+
+# === SETUP PREFERENCES ===
+# These are set automatically by `npx create-outworkos` — edit to change behavior on re-run.
 
 # === OPTIONAL USER SETTINGS ===
 

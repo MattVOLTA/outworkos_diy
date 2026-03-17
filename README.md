@@ -75,9 +75,9 @@ storage:
 1. Create a project at [supabase.com](https://supabase.com)
 2. Enable the **Vault** extension (Database > Extensions > `supabase_vault`)
 3. Run the three migration files in order via the SQL Editor:
-   - `migrations/001_core_schema.sql` — Tables
-   - `migrations/002_rls_policies.sql` — Row-level security
-   - `migrations/003_vault_functions.sql` — Vault wrapper functions + project manifest RPC
+   - `supabase/migrations/20260101000001_core_schema.sql` — Tables
+   - `supabase/migrations/20260101000002_rls_policies.sql` — Row-level security
+   - `supabase/vault_functions.sql` — Vault wrapper functions + project manifest RPC (requires superuser)
 4. Create a user account (Authentication > Users > Add User)
 5. Store the service role key in Keychain:
 
