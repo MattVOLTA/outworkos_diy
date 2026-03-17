@@ -19,16 +19,20 @@ SCOPES="https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/
 GET_SECRET="$SCRIPT_DIR/get-secret.sh"
 SET_SECRET="$SCRIPT_DIR/set-secret.sh"
 
-# --- Load credentials from Vault ---
-GOOGLE_CLIENT_ID=$("$GET_SECRET" google_client_id) || {
-  echo "Error: google_client_id not found in Vault. Run: scripts/set-secret.sh google_client_id <value>"
-  exit 1
-}
-GOOGLE_CLIENT_SECRET=$("$GET_SECRET" google_client_secret) || {
-  echo "Error: google_client_secret not found in Vault. Run: scripts/set-secret.sh google_client_secret <value>"
-  exit 1
-}
-GOOGLE_REFRESH_TOKEN=$("$GET_SECRET" google_refresh_token) || true
+# --- Load credentials (env vars take precedence, then Vault) ---
+if [ -z "$GOOGLE_CLIENT_ID" ]; then
+  GOOGLE_CLIENT_ID=$("$GET_SECRET" google_client_id 2>/dev/null) || {
+    echo "Error: google_client_id not found in Vault. Run: scripts/set-secret.sh google_client_id <value>"
+    exit 1
+  }
+fi
+if [ -z "$GOOGLE_CLIENT_SECRET" ]; then
+  GOOGLE_CLIENT_SECRET=$("$GET_SECRET" google_client_secret 2>/dev/null) || {
+    echo "Error: google_client_secret not found in Vault. Run: scripts/set-secret.sh google_client_secret <value>"
+    exit 1
+  }
+fi
+GOOGLE_REFRESH_TOKEN=$("$GET_SECRET" google_refresh_token 2>/dev/null) || true
 
 # --- Parse flags ---
 FORCE=false
@@ -89,8 +93,19 @@ update_env_token() {
   local NEW_TOKEN="$1"
   local TODAY=$(date +%Y-%m-%d)
 
-  "$SET_SECRET" google_refresh_token "$NEW_TOKEN" "Google refresh token generated ${TODAY} with Gmail + Gmail Settings + Calendar + Contacts + Drive scopes"
-  echo "Stored new refresh token in Vault (generated $TODAY)"
+  if "$SET_SECRET" google_refresh_token "$NEW_TOKEN" "Google refresh token generated ${TODAY} with Gmail + Gmail Settings + Calendar + Contacts + Drive scopes" 2>/dev/null; then
+    echo "Stored new refresh token in Vault (generated $TODAY)"
+  else
+    echo ""
+    echo "Warning: Could not store refresh token in Vault."
+    echo "Vault functions may be missing — run migration 003_vault_functions.sql"
+    echo ""
+    echo "Your refresh token (save it manually):"
+    echo "  $NEW_TOKEN"
+    echo ""
+    echo "Store it with: scripts/set-secret.sh google_refresh_token \"$NEW_TOKEN\""
+    exit 1
+  fi
 }
 
 # --- Re-authentication flow ---
